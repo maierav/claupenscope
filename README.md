@@ -1,7 +1,5 @@
 # openscope-pp
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/maierav/claupenscope/blob/main/notebooks/openscope_pp_demo.ipynb)
-
 Analysis toolkit for the [OpenScope Community Predictive Processing](https://allenneuraldynamics.github.io/openscope-community-predictive-processing/) project.
 
 Streams NWB files from [DANDI](https://dandiarchive.org) (dandisets 001637, 001768, 001424) and provides a common trial-aligned representation across three recording techniques:
