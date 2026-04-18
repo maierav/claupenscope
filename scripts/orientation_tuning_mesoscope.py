@@ -1,12 +1,16 @@
-"""Mesoscope orientation tuning — all 8 planes, soma ROIs.
+"""Mesoscope orientation tuning — all 8 planes, soma ROIs, grouped by area.
 
 Uses Control block 2_presentations (14 directions × 80 trials, 0.267s stimuli).
 Orientations stored in radians in the NWB file.
 
+Areas:
+  VISp — planes 0–3 (primary visual cortex)
+  VISl — planes 4–7 (lateral visual area)
+
 Saves:
-  ori_tuning_meso_polar.png   — top-24 polar curves for best plane (by median OSI)
-  ori_tuning_meso_stats.png   — OSI / DSI distributions per plane
-  ori_tuning_meso_orimap.png  — spatial map of preferred orientation (VISp_0)
+  ori_tuning_meso_polar.png    — top-24 polar curves per area (best plane per area)
+  ori_tuning_meso_planes.png   — OSI / DSI per plane, colour-coded by area
+  ori_tuning_meso_areas.png    — area-level OSI / DSI comparison (pooled across planes)
 """
 import time
 import numpy as np
@@ -22,11 +26,16 @@ import h5py
 DANDISET_ID = "001768"
 PLANES      = ["VISp_0", "VISp_1", "VISp_2", "VISp_3",
                "VISl_4", "VISl_5", "VISl_6", "VISl_7"]
+AREAS       = {
+    "VISp": ["VISp_0", "VISp_1", "VISp_2", "VISp_3"],
+    "VISl": ["VISl_4", "VISl_5", "VISl_6", "VISl_7"],
+}
+AREA_COLORS = {"VISp": "#4878CF", "VISl": "#D65F5F"}
 BLOCK_NAME  = "Control block 2_presentations"
 WINDOW      = (-0.3, 1.2)     # wide to capture slow GCaMP response
 RESP_WIN    = (0.1, 0.8)      # response window (GCaMP dynamics)
 BL_WIN      = (-0.25, 0.0)
-N_POLAR     = 24              # top ROIs to show in polar grid
+N_POLAR     = 12              # top ROIs per area to show in polar grid
 
 # ── Open file ─────────────────────────────────────────────────────────
 print(f"Connecting to dandiset {DANDISET_ID}…")
@@ -133,37 +142,43 @@ for plane in PLANES:
                           n_soma=n_soma, tc=tc)
     print(f"  OSI: {np.median(OSI):.3f} median  DSI: {np.median(DSI):.3f} median")
 
-# ── Figure 1: Polar curves for best plane ────────────────────────────
-best_plane = max(PLANES, key=lambda p: np.median(results[p]["OSI"]))
-r   = results[best_plane]
-n_show  = min(N_POLAR, r["n_soma"])
-order   = np.argsort(r["OSI"])[::-1][:n_show]
-n_cols  = 6
-n_rows  = int(np.ceil(n_show / n_cols))
-
-fig, axes = plt.subplots(n_rows, n_cols,
-                          figsize=(n_cols * 2.0, n_rows * 2.0),
-                          subplot_kw={"projection": "polar"},
-                          squeeze=False)
+# ── Figure 1: Polar curves — top N_POLAR per area (best plane per area) ──
 theta = np.append(dirs_rad, dirs_rad[0])
 cmap  = plt.cm.hsv
 
-for plot_i in range(n_rows * n_cols):
-    row, col = divmod(plot_i, n_cols)
-    ax = axes[row, col]
-    if plot_i >= n_show:
-        ax.set_visible(False); continue
-    uid = order[plot_i]
-    c   = np.append(r["curves"][uid], r["curves"][uid][0])
-    c   = np.clip(c, 0, None)
-    color = cmap(r["pref_ori"][uid] / np.pi)
-    ax.plot(theta, c, lw=1.5, color=color)
-    ax.fill(theta, c, alpha=0.25, color=color)
-    ax.set(xticks=[], yticks=[])
-    ax.set_title(f"ROI {uid}\nOSI={r['OSI'][uid]:.2f}", fontsize=6, pad=2)
+fig, all_axes = plt.subplots(
+    len(AREAS) * int(np.ceil(N_POLAR / 6)), 6,
+    figsize=(6 * 2.0, len(AREAS) * int(np.ceil(N_POLAR / 6)) * 2.0),
+    subplot_kw={"projection": "polar"}, squeeze=False
+)
+
+row_offset = 0
+for area_name, area_planes in AREAS.items():
+    best_plane = max(area_planes, key=lambda p: np.median(results[p]["OSI"]))
+    r = results[best_plane]
+    n_show = min(N_POLAR, r["n_soma"])
+    order  = np.argsort(r["OSI"])[::-1][:n_show]
+    n_rows_area = int(np.ceil(N_POLAR / 6))
+
+    for plot_i in range(n_rows_area * 6):
+        row = row_offset + plot_i // 6
+        col = plot_i % 6
+        ax  = all_axes[row, col]
+        if plot_i >= n_show:
+            ax.set_visible(False); continue
+        uid   = order[plot_i]
+        c     = np.clip(np.append(r["curves"][uid], r["curves"][uid][0]), 0, None)
+        color = cmap(r["pref_ori"][uid] / np.pi)
+        ax.plot(theta, c, lw=1.5, color=color)
+        ax.fill(theta, c, alpha=0.25, color=color)
+        ax.set(xticks=[], yticks=[])
+        ax.set_title(f"{area_name} ROI {uid}\nOSI={r['OSI'][uid]:.2f}", fontsize=6, pad=2)
+
+    row_offset += n_rows_area
+    print(f"  {area_name}: best plane = {best_plane}  (median OSI={np.median(r['OSI']):.3f})")
 
 fig.suptitle(
-    f"Mesoscope {best_plane} — top {n_show} soma ROIs by OSI\n"
+    f"Mesoscope orientation tuning — top {N_POLAR} ROIs per area\n"
     f"sub-839909  ·  {n_dirs} directions  ·  response {RESP_WIN[0]*1000:.0f}–{RESP_WIN[1]*1000:.0f} ms",
     fontsize=9, fontweight="bold"
 )
@@ -171,59 +186,84 @@ fig.tight_layout()
 fig.savefig("ori_tuning_meso_polar.png", dpi=150, bbox_inches="tight")
 print("\nSaved → ori_tuning_meso_polar.png")
 
-# ── Figure 2: OSI / DSI distributions per plane ───────────────────────
+# ── Figure 2: OSI / DSI per plane, colour-coded by area ──────────────
+bins = np.linspace(0, 1, 14)
 fig, axes = plt.subplots(2, 4, figsize=(16, 7))
 axes = axes.ravel()
-bins = np.linspace(0, 1, 14)
 
 for ax, plane in zip(axes, PLANES):
-    r = results[plane]
-    ax.hist(r["OSI"], bins=bins, color="#4878CF", alpha=0.7, label="OSI")
-    ax.hist(r["DSI"], bins=bins, color="#D65F5F", alpha=0.5, label="DSI")
-    ax.axvline(np.median(r["OSI"]), color="#4878CF", lw=1.5, ls="--")
-    ax.axvline(np.median(r["DSI"]), color="#D65F5F", lw=1.5, ls="--")
-    ax.set(title=f"{plane}  ({r['n_soma']} soma)\nOSI={np.median(r['OSI']):.2f}  DSI={np.median(r['DSI']):.2f}",
+    area = "VISp" if plane.startswith("VISp") else "VISl"
+    col  = AREA_COLORS[area]
+    r    = results[plane]
+    ax.hist(r["OSI"], bins=bins, color=col,   alpha=0.75, label="OSI")
+    ax.hist(r["DSI"], bins=bins, color="gray", alpha=0.45, label="DSI")
+    ax.axvline(np.median(r["OSI"]), color=col,   lw=1.5, ls="--")
+    ax.axvline(np.median(r["DSI"]), color="gray", lw=1.5, ls="--")
+    ax.set(title=f"[{area}]  {plane}  ({r['n_soma']} soma)\n"
+                 f"OSI={np.median(r['OSI']):.2f}  DSI={np.median(r['DSI']):.2f}",
            xlabel="Index", ylabel="ROI count", xlim=(0, 1))
     ax.legend(fontsize=6, loc="upper right")
     ax.spines[["top", "right"]].set_visible(False)
 
-fig.suptitle("Mesoscope orientation tuning — OSI & DSI per plane  (sub-839909)",
+fig.suptitle("Mesoscope orientation tuning — OSI & DSI per plane  (sub-839909)\n"
+             "Blue = VISp · Red = VISl",
              fontsize=11, fontweight="bold")
 fig.tight_layout()
-fig.savefig("ori_tuning_meso_stats.png", dpi=150, bbox_inches="tight")
-print("Saved → ori_tuning_meso_stats.png")
+fig.savefig("ori_tuning_meso_planes.png", dpi=150, bbox_inches="tight")
+print("Saved → ori_tuning_meso_planes.png")
 
-# ── Figure 3: Spatial preferred-orientation map (VISp_0) ─────────────
-# Load ROI centroids from segmentation mask
-plane   = "VISp_0"
-r       = results[plane]
-base    = f"processing/{plane}/image_segmentation"
-try:
-    cx = f[f"{base}/roi_table/x"][:].astype(float)
-    cy = f[f"{base}/roi_table/y"][:].astype(float)
-    is_soma = f[f"{base}/roi_table/is_soma"][:].astype(bool)
-    cx_s = cx[is_soma]; cy_s = cy[is_soma]
+# ── Figure 3: Area-level comparison (pooled across planes) ────────────
+fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+bins = np.linspace(0, 1, 16)
 
-    fig, ax = plt.subplots(figsize=(6, 6))
-    sc = ax.scatter(cx_s, cy_s,
-                    c=r["pref_ori"] / np.pi,      # 0–1 maps to 0–180°
-                    cmap="hsv", vmin=0, vmax=1,
-                    s=np.clip(r["OSI"] * 60, 4, 60),   # size ~ OSI
-                    alpha=0.85, edgecolors="none")
-    cb = plt.colorbar(sc, ax=ax, label="Preferred orientation (°)")
-    cb.set_ticks([0, 0.25, 0.5, 0.75, 1])
-    cb.set_ticklabels(["0°", "45°", "90°", "135°", "180°"])
-    ax.set(xlabel="X (px)", ylabel="Y (px)",
-           title=f"VISp_0 — preferred orientation map  ({r['n_soma']} soma)\n"
-                 f"dot size ∝ OSI  ·  color = preferred orientation")
-    ax.invert_yaxis()
-    ax.set_aspect("equal")
-    ax.spines[["top", "right"]].set_visible(False)
-    fig.tight_layout()
-    fig.savefig("ori_tuning_meso_orimap.png", dpi=150, bbox_inches="tight")
-    print("Saved → ori_tuning_meso_orimap.png")
-except Exception as e:
-    print(f"  Orientation map skipped (centroid data not available): {e}")
+for area_name, area_planes in AREAS.items():
+    color = AREA_COLORS[area_name]
+    OSI_pool = np.concatenate([results[p]["OSI"] for p in area_planes])
+    DSI_pool = np.concatenate([results[p]["DSI"] for p in area_planes])
+    pori_pool = np.concatenate([results[p]["pref_ori"] for p in area_planes])
+    n_pool = len(OSI_pool)
+
+    # Panel 1: OSI
+    axes[0].hist(OSI_pool, bins=bins, color=color, alpha=0.6,
+                 label=f"{area_name}  n={n_pool}\nmedian={np.median(OSI_pool):.2f}")
+    axes[0].axvline(np.median(OSI_pool), color=color, lw=2, ls="--")
+
+    # Panel 2: DSI
+    axes[1].hist(DSI_pool, bins=bins, color=color, alpha=0.6,
+                 label=f"{area_name}  median={np.median(DSI_pool):.2f}")
+    axes[1].axvline(np.median(DSI_pool), color=color, lw=2, ls="--")
+
+axes[0].set(xlabel="OSI", ylabel="ROI count", title="Orientation Selectivity by Area")
+axes[0].legend(fontsize=8); axes[0].spines[["top","right"]].set_visible(False)
+axes[1].set(xlabel="DSI", ylabel="ROI count", title="Direction Selectivity by Area")
+axes[1].legend(fontsize=8); axes[1].spines[["top","right"]].set_visible(False)
+
+# Panel 3: preferred orientation wheel per area
+ax3 = fig.add_subplot(1, 3, 3, projection="polar")
+axes[2].set_visible(False)
+bin_edges = np.linspace(0, 180, 13)
+bc = np.radians(0.5 * (bin_edges[:-1] + bin_edges[1:]))
+theta_full = np.concatenate([bc, bc + np.pi])
+
+for area_name, area_planes in AREAS.items():
+    color = AREA_COLORS[area_name]
+    pori_pool = np.concatenate([results[p]["pref_ori"] for p in area_planes])
+    counts, _ = np.histogram(np.degrees(pori_pool), bins=bin_edges)
+    counts_full = np.tile(counts / counts.max(), 2)   # normalise for overlay
+    ax3.plot(np.append(theta_full, theta_full[0]),
+             np.append(counts_full, counts_full[0]),
+             color=color, lw=2, label=area_name)
+    ax3.fill(theta_full, counts_full, color=color, alpha=0.2)
+
+ax3.set_title("Preferred orientation\n(normalised)", fontsize=8)
+ax3.set_xticklabels(["0°","45°","90°","135°","180°","225°","270°","315°"], fontsize=6)
+ax3.legend(fontsize=8, loc="upper right", bbox_to_anchor=(1.3, 1.1))
+
+fig.suptitle("Mesoscope orientation tuning — VISp vs VISl  (sub-839909)",
+             fontsize=11, fontweight="bold")
+fig.tight_layout()
+fig.savefig("ori_tuning_meso_areas.png", dpi=150, bbox_inches="tight")
+print("Saved → ori_tuning_meso_areas.png")
 
 f.close()
 print("\nDone.")
