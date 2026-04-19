@@ -22,6 +22,7 @@ Usage:
 import time
 import os
 import sys
+import pickle
 import numpy as np
 import requests
 import remfile
@@ -103,6 +104,10 @@ def pop_psth(arr, centers):
     s = per_trial.std(axis=0) / np.sqrt(per_trial.shape[0])
     return m, s
 
+# ── Cache directory ───────────────────────────────────────────────────
+CACHE_DIR = "results/oddball_cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
+
 # ── Load asset list ───────────────────────────────────────────────────
 print(f"Fetching asset list for dandiset {DANDISET_ID}…")
 client = DandiAPIClient()
@@ -119,7 +124,19 @@ t_total = time.time()
 for si, asset in enumerate(assets):
     asset_id   = asset.identifier
     subject_id = asset.path.split("/")[0]
+    cache_path = os.path.join(CACHE_DIR, f"{asset_id[:8]}.pkl")
     print(f"\n[{si+1}/{len(assets)}] {subject_id}  {asset_id[:8]}…")
+
+    # ── Resume from cache if available ───────────────────────────────
+    if os.path.exists(cache_path):
+        print(f"  CACHED — loading from {cache_path}")
+        with open(cache_path, "rb") as fh:
+            cached = pickle.load(fh)
+        paradigm_data[cached["paradigm"]].append(cached["session_entry"])
+        for mi_entry in cached["mi_entries"]:
+            paradigm_mi[cached["paradigm"]].append(mi_entry)
+        continue
+
     t0 = time.time()
 
     try:
@@ -219,13 +236,25 @@ for si, asset in enumerate(assets):
         session_psths["control"] = pop_psth((ctrl_arr - mu_z) / sig_z, centers)
         print(f"{time.time()-t0:.0f}s total")
 
-        paradigm_data[paradigm].append({
+        session_entry = {
             "psths": session_psths,
             "centers": centers,
             "trial_types": list(dev_rows.keys()),
             "n_units": n_qual,
             "session": asset_id[:8],
-        })
+        }
+        mi_entries = [e for e in paradigm_mi[paradigm]
+                      if e["session"] == asset_id[:8]]
+        paradigm_data[paradigm].append(session_entry)
+
+        # Save to cache so re-runs skip this session
+        with open(cache_path, "wb") as fh:
+            pickle.dump({
+                "paradigm":     paradigm,
+                "session_entry": session_entry,
+                "mi_entries":   mi_entries,
+            }, fh)
+        print(f"  Cached → {cache_path}")
 
         handle.close()
 
