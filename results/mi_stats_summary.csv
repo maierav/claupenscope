@@ -1,0 +1,36 @@
+technique,paradigm,trial_type,n,mean_mi,sem_mi,t,p,sig
+ecephys,DURATION,jitter,1,0.0005,,,,n.s.(low n)
+ecephys,DURATION,omission,1,0.0229,,,,n.s.(low n)
+ecephys,SENSORYMOTOR,motor_halt,2,-0.0016,0.0004,,,n.s.(low n)
+ecephys,SENSORYMOTOR,motor_omission,2,0.0299,0.0085,,,n.s.(low n)
+ecephys,SENSORYMOTOR,motor_orientation_45,2,0.0892,0.0109,,,n.s.(low n)
+ecephys,SENSORYMOTOR,motor_orientation_90,2,0.1095,0.0032,,,n.s.(low n)
+ecephys,SEQUENCE,halt,2,0.0206,0.0091,,,n.s.(low n)
+ecephys,SEQUENCE,omission,2,-0.0216,0.0025,,,n.s.(low n)
+ecephys,SEQUENCE,orientation_45,2,0.0108,0.0030,,,n.s.(low n)
+ecephys,SEQUENCE,orientation_90,2,0.0079,0.0054,,,n.s.(low n)
+ecephys,SEQUENCE,sequence_omission,2,-0.0142,0.0055,,,n.s.(low n)
+ecephys,STANDARD,halt,1,0.0098,,,,n.s.(low n)
+ecephys,STANDARD,omission,1,-0.0244,,,,n.s.(low n)
+ecephys,STANDARD,orientation_45,1,0.0097,,,,n.s.(low n)
+ecephys,STANDARD,orientation_90,1,0.0304,,,,n.s.(low n)
+mesoscope,DURATION,jitter,8,0.0451,0.0078,5.4313,0.0010,***
+mesoscope,DURATION,omission,8,0.1470,0.0437,3.1464,0.0162,*
+mesoscope,SENSORYMOTOR,motor_halt,12,0.0566,0.0170,3.1957,0.0085,**
+mesoscope,SENSORYMOTOR,motor_omission,12,0.0778,0.0119,6.2398,0.0001,***
+mesoscope,SENSORYMOTOR,motor_orientation_45,12,0.1113,0.0150,7.0915,0.0000,***
+mesoscope,SENSORYMOTOR,motor_orientation_90,12,0.1921,0.0191,9.6471,0.0000,***
+mesoscope,SEQUENCE,halt,9,-0.0098,0.0295,-0.3113,0.7635,ns
+mesoscope,SEQUENCE,omission,9,-0.0597,0.0103,-5.4579,0.0006,***
+mesoscope,SEQUENCE,orientation_45,9,-0.0297,0.0129,-2.1784,0.0610,ns
+mesoscope,SEQUENCE,orientation_90,9,0.0167,0.0127,1.2400,0.2501,ns
+mesoscope,SEQUENCE,sequence_omission,9,-0.0199,0.0075,-2.4976,0.0371,*
+mesoscope,STANDARD,halt,13,0.1035,0.0114,8.7410,0.0000,***
+mesoscope,STANDARD,omission,13,0.1871,0.0276,6.5086,0.0000,***
+mesoscope,STANDARD,orientation_45,13,0.0454,0.0154,2.8424,0.0148,*
+mesoscope,STANDARD,orientation_90,13,0.0656,0.0220,2.8632,0.0143,*
+slap2,SLAP2,0,16,0.0406,0.0228,1.7278,0.1045,ns
+slap2,SLAP2,45,18,0.0363,0.0170,2.0677,0.0542,ns
+slap2,SLAP2,90,18,0.0343,0.0157,2.1266,0.0484,*
+slap2,SLAP2,omission,18,-0.0198,0.0082,-2.3578,0.0306,*
+slap2,SLAP2,static,2,-0.0111,0.0051,,,n.s.(low n)
