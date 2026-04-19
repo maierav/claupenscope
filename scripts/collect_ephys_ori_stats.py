@@ -22,7 +22,7 @@ from dandi.dandiapi import DandiAPIClient
 
 # ── Config ────────────────────────────────────────────────────────────
 DANDISET_ID  = "001637"
-BLOCK_NAME   = "sequential_control_block"
+BLOCK_NAME   = "Control block 2_presentations"  # BlockType = sequential_control_block
 ORI_WINDOW   = (-0.1, 0.5)
 ORI_BIN      = 0.01
 RESP_WIN     = (0.03, 0.25)
