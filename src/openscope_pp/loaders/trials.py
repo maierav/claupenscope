@@ -83,6 +83,7 @@ _BLOCK_TYPE_MAP = {
     "sensorimotor_closed_loop": "paradigm_oddball",
     "motor_oddball": "paradigm_oddball",
     "duration_oddball": "paradigm_oddball",
+    "jitter_oddball": "paradigm_oddball",   # duration mismatch variant
     "standard_oddball": "paradigm_oddball",
     "open_loop_prerecorded": "control_replay",
     "rf_mapping": "rf_mapping",
@@ -90,6 +91,9 @@ _BLOCK_TYPE_MAP = {
     "trippy": "movie",
     "zebra": "movie",
     "spontaneous": "spontaneous",
+    "standard_control": "control_standard",
+    "sequential_control_block": "control_sequential",
+    "jitter_control": "control_jitter",
     "None or Blank": "blank",
     "": "blank",
 }
