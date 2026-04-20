@@ -49,8 +49,10 @@ def compute_rf_maps(
     resp_mask = (time >= response_window[0]) & (time < response_window[1])
     base_mask = (time >= baseline_window[0]) & (time < baseline_window[1])
 
-    resp_mean = responses.values[:, :, resp_mask].mean(axis=2)  # (trial, unit)
-    base_mean = responses.values[:, :, base_mask].mean(axis=2)
+    # NaN-aware: interp-derived snippets can carry edge NaNs on individual
+    # trials (onsets near recording boundaries); plain .mean would propagate.
+    resp_mean = np.nanmean(responses.values[:, :, resp_mask], axis=2)  # (trial, unit)
+    base_mean = np.nanmean(responses.values[:, :, base_mask], axis=2)
     delta = resp_mean - base_mean
 
     x_vals = np.sort(trials["x"].dropna().unique())

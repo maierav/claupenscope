@@ -281,8 +281,12 @@ for ax, paradigm in zip(axes, present):
     std_means = np.array([interp_psth(s, "standard") for s in sessions
                           if interp_psth(s, "standard") is not None])
     if len(std_means):
-        m = std_means.mean(axis=0)
-        se = std_means.std(axis=0) / np.sqrt(len(std_means))
+        # NaN-aware: a session whose interpolated PSTH has edge NaN at any
+        # time point would otherwise wipe the cross-session mean at that
+        # sample. Use nanmean/nanstd with a finite-count-based SEM.
+        m = np.nanmean(std_means, axis=0)
+        n_eff = np.sum(np.isfinite(std_means), axis=0).clip(1)
+        se = np.nanstd(std_means, axis=0) / np.sqrt(n_eff)
         ax.fill_between(COMMON_T, m-se, m+se, color="#4878CF", alpha=0.20)
         ax.plot(COMMON_T, m, color="#4878CF", lw=2.5,
                 label=f"standard (n={len(sessions)} sess)")
@@ -290,7 +294,7 @@ for ax, paradigm in zip(axes, present):
     ctrl_means = np.array([interp_psth(s, "control") for s in sessions
                            if interp_psth(s, "control") is not None])
     if len(ctrl_means):
-        ax.plot(COMMON_T, ctrl_means.mean(axis=0), color="#888888",
+        ax.plot(COMMON_T, np.nanmean(ctrl_means, axis=0), color="#888888",
                 lw=1.5, ls="--", alpha=0.8, label="control block")
 
     for ci, tt in enumerate(all_tts):
@@ -298,8 +302,10 @@ for ax, paradigm in zip(axes, present):
         dev_means = np.array([interp_psth(s, tt) for s in sessions
                               if interp_psth(s, tt) is not None])
         if len(dev_means) == 0: continue
-        m  = dev_means.mean(axis=0)
-        se = dev_means.std(axis=0) / np.sqrt(len(dev_means))
+        # NaN-aware (same reasoning as std_means above).
+        m  = np.nanmean(dev_means, axis=0)
+        n_eff = np.sum(np.isfinite(dev_means), axis=0).clip(1)
+        se = np.nanstd(dev_means, axis=0) / np.sqrt(n_eff)
         ax.fill_between(COMMON_T, m-se, m+se, color=color, alpha=0.15)
         ax.plot(COMMON_T, m, color=color, lw=2, label=f"{tt} (n={len(dev_means)})")
 

@@ -116,8 +116,11 @@ def compute_oddball_index(
     resp_mask = (time >= response_window[0]) & (time < response_window[1])
     base_mask = (time >= baseline_window[0]) & (time < baseline_window[1])
 
-    resp_amp = responses.values[:, :, resp_mask].mean(axis=2)
-    base_amp = responses.values[:, :, base_mask].mean(axis=2)
+    # NaN-aware: interp-derived snippets may carry edge NaNs on individual
+    # trials (onsets near recording boundaries). Plain .mean would propagate
+    # those to the whole (trial, unit) cell.
+    resp_amp = np.nanmean(responses.values[:, :, resp_mask], axis=2)
+    base_amp = np.nanmean(responses.values[:, :, base_mask], axis=2)
     delta = resp_amp - base_amp  # (trial, unit)
 
     std_delta = delta[~is_dev, :]

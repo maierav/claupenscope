@@ -62,9 +62,10 @@ def compute_orientation_tuning(
     resp_mask = (time >= response_window[0]) & (time < response_window[1])
     base_mask = (time >= baseline_window[0]) & (time < baseline_window[1])
 
-    # Mean response per trial per unit
-    resp_mean = responses.values[:, :, resp_mask].mean(axis=2)  # (trial, unit)
-    base_mean = responses.values[:, :, base_mask].mean(axis=2)  # (trial, unit)
+    # Mean response per trial per unit. NaN-aware: interp-derived snippets
+    # can carry edge NaNs on individual trials; plain .mean would propagate.
+    resp_mean = np.nanmean(responses.values[:, :, resp_mask], axis=2)  # (trial, unit)
+    base_mean = np.nanmean(responses.values[:, :, base_mask], axis=2)  # (trial, unit)
     delta = resp_mean - base_mean  # baseline-subtracted
 
     unique_oris = np.sort(np.unique(orientations))

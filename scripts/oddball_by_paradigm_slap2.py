@@ -34,7 +34,10 @@ SKIP_SUBJECT = "sub-794237"   # older NWB format — no intervals/gratings
 DMD_OFFSETS = {"DMD1": 0.115, "DMD2": -0.165}
 
 ODD_WINDOW  = (-0.5, 1.0)
-RESP_WIN    = (0.1,  0.6)    # calcium signal, wider than ephys
+# SLAP2 oddball ISI = 700 ms, so the response window must stay well below
+# the next trial onset. iGluSnFR is fast (tens of ms), so 0.05-0.35 s
+# captures the transient cleanly without tail contamination.
+RESP_WIN    = (0.05, 0.35)
 BL_WIN      = (-0.35, 0.0)
 N_STD_MAX   = 300
 CACHE_DIR   = "results/oddball_cache_slap2"
