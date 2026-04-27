@@ -31,7 +31,7 @@
 ## Dandisets
 | Technique | Dandiset | Sessions |
 |-----------|----------|----------|
-| Ecephys (Neuropixels) | 001637 | 6 |
+| Ecephys (Neuropixels) | 001637 | 46 across 14 subjects (was 6/2 before 2026-04 expansion) |
 | Mesoscope (GCaMP) | 001768 | 42 |
 | SLAP2 | 001424 | 9 (skip sub-794237) |
 
@@ -47,4 +47,5 @@
 - SLAP2 sub-794237 uses an older NWB format — always skip it
 - SLAP2 DMD timing offsets: DMD1 = +0.115 s, DMD2 = −0.165 s relative to trial `start_time`
 - Mesoscope SEQUENCE paradigm: omission MI is **negative** in calcium (suppression, not mismatch) — this is real, not a bug
-- Ecephys has only 1–2 sessions per paradigm — insufficient for t-tests, show data only
+- Mesoscope STANDARD paradigm omission MI is positive but contaminated: real prediction-error rise lives at ~0.3–0.6 s, but the 0.1–0.8 s window also picks up an adaptation-release-amplified next-stim response at ~0.7–0.8 s (701 ms SOA + GCaMP kinetics). Genuine effect, not directly comparable to ecephys/SLAP2 MIs
+- Ecephys 001637 expanded 2026-04 from 6 → 46 sessions across 14 subjects (~10–12 sessions per paradigm). Cross-session t-tests on MI vs. 0 are now appropriate; the old "show-only" caveat is obsolete

@@ -32,6 +32,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from collections import defaultdict
 from dandi.dandiapi import DandiAPIClient
+from scipy import stats as sstats
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from openscope_pp.loaders.streaming import open_nwb
@@ -297,8 +298,11 @@ for ax, paradigm in zip(axes, present):
     std_means = np.array([s["psths"]["standard"][0] for s in sessions
                            if "standard" in s["psths"]])
     if len(std_means):
-        m = std_means.mean(axis=0)
-        s_err = std_means.std(axis=0) / np.sqrt(len(std_means))
+        # NaN-aware: don't let one session with edge NaN at a sample wipe
+        # the cross-session mean at that sample.
+        m = np.nanmean(std_means, axis=0)
+        n_eff = np.sum(np.isfinite(std_means), axis=0).clip(1)
+        s_err = np.nanstd(std_means, axis=0) / np.sqrt(n_eff)
         ax.fill_between(centers, m - s_err, m + s_err,
                         color="#4878CF", alpha=0.20)
         ax.plot(centers, m, color="#4878CF", lw=2.5,
@@ -308,7 +312,7 @@ for ax, paradigm in zip(axes, present):
     ctrl_means = np.array([s["psths"]["control"][0] for s in sessions
                             if "control" in s["psths"]])
     if len(ctrl_means):
-        m = ctrl_means.mean(axis=0)
+        m = np.nanmean(ctrl_means, axis=0)
         ax.plot(centers, m, color="#888888", lw=1.5, ls="--",
                 alpha=0.8, label="control block")
 
@@ -319,8 +323,10 @@ for ax, paradigm in zip(axes, present):
                                if tt in s["psths"]])
         if len(dev_means) == 0:
             continue
-        m = dev_means.mean(axis=0)
-        s_err = dev_means.std(axis=0) / np.sqrt(len(dev_means))
+        # NaN-aware (same reasoning as std_means above).
+        m = np.nanmean(dev_means, axis=0)
+        n_eff = np.sum(np.isfinite(dev_means), axis=0).clip(1)
+        s_err = np.nanstd(dev_means, axis=0) / np.sqrt(n_eff)
         ax.fill_between(centers, m - s_err, m + s_err, color=color, alpha=0.15)
         n_sess_tt = len(dev_means)
         ax.plot(centers, m, color=color, lw=2,
@@ -344,6 +350,13 @@ fig, ax = plt.subplots(figsize=(10, 5))
 x_pos = 0
 xtick_pos, xtick_lab = [], []
 
+# Stats: per (paradigm, trial_type), one-sample t-test and Wilcoxon
+# signed-rank against MI = 0. With ~10-12 sessions per paradigm (post
+# 2026-04 expansion) this is now adequately powered.
+stats_rows = []  # collected for CSV
+def _sig(p):
+    return "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else "ns"
+
 for pi, paradigm in enumerate(present):
     sessions_mi = paradigm_mi[paradigm]
     if not sessions_mi:
@@ -355,13 +368,45 @@ for pi, paradigm in enumerate(present):
 
     for ci, (tt, vals) in enumerate(sorted(tt_map.items())):
         color = DEV_PALETTE[ci % len(DEV_PALETTE)]
-        mn = np.mean(vals)
-        sem = np.std(vals) / np.sqrt(len(vals)) if len(vals) > 1 else 0
+        vals_arr = np.asarray(vals, dtype=float)
+        finite   = vals_arr[np.isfinite(vals_arr)]
+        n        = len(finite)
+        mn       = float(np.mean(finite)) if n else float("nan")
+        sem      = float(np.std(finite, ddof=1) / np.sqrt(n)) if n > 1 else 0.0
+
+        # t-test (n>=2) and Wilcoxon (n>=6 and not all zeros) — skip otherwise
+        t_stat = t_p = w_stat = w_p = float("nan")
+        if n >= 2:
+            t_res = sstats.ttest_1samp(finite, 0.0)
+            t_stat, t_p = float(t_res.statistic), float(t_res.pvalue)
+        if n >= 6 and np.any(finite != 0):
+            try:
+                w_res = sstats.wilcoxon(finite, alternative="two-sided",
+                                        zero_method="wilcox")
+                w_stat, w_p = float(w_res.statistic), float(w_res.pvalue)
+            except ValueError:
+                pass
+
+        stats_rows.append({
+            "paradigm": paradigm, "trial_type": tt, "n_sessions": n,
+            "mean_MI": mn, "sem_MI": sem,
+            "t_stat": t_stat, "t_pvalue": t_p,
+            "wilcoxon_stat": w_stat, "wilcoxon_pvalue": w_p,
+        })
+
         ax.bar(x_pos, mn, yerr=sem, color=color, width=0.7,
                alpha=0.8, capsize=4, label=f"{paradigm}:{tt}" if pi == 0 else None)
-        ax.scatter([x_pos] * len(vals), vals, color="k", s=20, alpha=0.7, zorder=3)
+        ax.scatter([x_pos] * n, finite, color="k", s=20, alpha=0.7, zorder=3)
+        # Annotate significance above bar (use t-test as primary)
+        if np.isfinite(t_p):
+            y_an = (mn + sem if mn >= 0 else mn - sem)
+            va   = "bottom" if mn >= 0 else "top"
+            off  = 4 if mn >= 0 else -4
+            ax.annotate(_sig(t_p), xy=(x_pos, y_an),
+                        xytext=(0, off), textcoords="offset points",
+                        ha="center", va=va, fontsize=8, fontweight="bold")
         xtick_pos.append(x_pos)
-        xtick_lab.append(f"{tt}\n({PARADIGM_LABELS[paradigm][:6]}…)")
+        xtick_lab.append(f"{tt}\n(n={n})")
         x_pos += 1
     x_pos += 0.8   # gap between paradigms
 
@@ -383,5 +428,23 @@ ax.spines[["top", "right"]].set_visible(False)
 fig.tight_layout()
 fig.savefig("oddball_mismatch_index.png", dpi=150, bbox_inches="tight")
 print("Saved → oddball_mismatch_index.png")
+
+# ── Save stats CSV ────────────────────────────────────────────────────
+if stats_rows:
+    import csv
+    os.makedirs("results", exist_ok=True)
+    csv_path = "results/oddball_mi_stats_ecephys.csv"
+    with open(csv_path, "w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(stats_rows[0].keys()))
+        w.writeheader(); w.writerows(stats_rows)
+    print(f"Saved → {csv_path}  ({len(stats_rows)} rows)")
+    # Brief summary to stdout
+    print("\nMI stats summary (one-sample t-test vs 0):")
+    for r in stats_rows:
+        print(f"  {r['paradigm']:12s} {r['trial_type']:20s} "
+              f"n={r['n_sessions']:2d}  "
+              f"MI={r['mean_MI']:+.3f}±{r['sem_MI']:.3f}  "
+              f"t={r['t_stat']:+.2f}  p={r['t_pvalue']:.4f}  "
+              f"{_sig(r['t_pvalue']) if np.isfinite(r['t_pvalue']) else ''}")
 
 print("\nDone.")
